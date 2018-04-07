@@ -8,9 +8,8 @@ from xbos.services import mdal
 import pandas as pd
 from scipy.spatial import distance
 
-
 def euclidian_distance(a, b):
-	return [(a[i] - b[i])**2 for i in range(len(a))]
+	return distance.euclidean(a, b)
 
 class SetpointsPredictor:
 
@@ -38,7 +37,7 @@ class SetpointsPredictor:
 		c = mdal.MDALClient("xbos/mdal", client=self.c)
 		dfs = c.do_query({'Composition': uuids,
 						  'Selectors': [mdal.MEAN]*len(uuids),
-						  'Time': {'T0': (now-timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S') + ' UTC',
+						  'Time': {'T0': (now-timedelta(days=25)).strftime('%Y-%m-%d %H:%M:%S') + ' UTC',
 								   'T1': now.strftime('%Y-%m-%d %H:%M:%S') + ' UTC',
 								   'WindowSize': str(self.interval)+'min',
 								   'Aligned': True}})
@@ -56,7 +55,7 @@ class SetpointsPredictor:
 
 
 	def find_similar_days(self, training_data, now, observation_length, k, method = euclidian_distance):
-		training_data.to_csv("lala.csv")
+
 		min_time = training_data.index[0] + timedelta(minutes=observation_length)
 		selector = ((training_data.index.minute == now.minute) &
 					(training_data.index.hour == now.hour) &
@@ -65,14 +64,6 @@ class SetpointsPredictor:
 		similar_moments = training_data[selector][:-1]
 		obs_td = timedelta(minutes=observation_length)
 
-		print similar_moments
-		"""
-		print [len(training_data[(training_data.index >= now - obs_td) &
-							 (training_data.index <= now)].get_values())]
-
-		print [len(training_data[(training_data.index >= i - obs_td) &
-							 (training_data.index <= i)].get_values()) for i in similar_moments.index]
-		"""
 		similar_moments['Similarity'] = [
 			method(training_data[(training_data.index >= now - obs_td) &
 								 (training_data.index <= now)].get_values(),
@@ -97,16 +88,15 @@ class SetpointsPredictor:
 	def predictions(self):
 		now = self.df.index[-1]
 		observation_length_addition = 4*60
-		k = 5
+		k = 3
 		prediction_time = 4*60
 		resample_time = self.interval
 
 		observation_length = self.mins_in_day(now) + observation_length_addition
-		similar_moments_thigh = self.find_similar_days(self.df['t_high'], now, observation_length, k)
-		predictions_thigh = self.predict(self.df['t_high'], now, similar_moments_thigh, prediction_time, resample_time)
-		print "past this"
-		similar_moments_tlow = self.find_similar_days(self.df['t_low'], now, observation_length, k)
-		predictions_tlow = self.predict(self.df['t_low'], now, similar_moments_tlow, prediction_time, resample_time)
+		similar_moments_thigh = self.find_similar_days(self.df['t_high'].to_frame(), now, observation_length, k)
+		predictions_thigh = self.predict(self.df['t_high'].to_frame(), now, similar_moments_thigh, prediction_time, resample_time)
+		similar_moments_tlow = self.find_similar_days(self.df['t_low'].to_frame(), now, observation_length, k)
+		predictions_tlow = self.predict(self.df['t_low'].to_frame(), now, similar_moments_tlow, prediction_time, resample_time)
 
 		return predictions_thigh, predictions_tlow
 
